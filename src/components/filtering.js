@@ -1,22 +1,19 @@
-import { createComparison, defaultRules } from "../lib/compare.js";
+export function initFiltering(elements) {
+  const updateIndexes = (elements, indexes) => {
+    Object.keys(indexes).forEach((elementName) => {
+      elements[elementName].append(
+        ...Object.values(indexes[elementName]).map((name) => {
+          const el = document.createElement("option");
+          el.textContent = name;
+          el.value = name;
+          return el;
+        }),
+      );
+    });
+  };
 
-// Настройка компаратора
-const compare = createComparison(defaultRules);
-
-export function initFiltering(elements, indexes) {
-  // Заполнение выпадающих списков опциями
-  Object.keys(indexes).forEach((elementName) => {
-    elements[elementName].append(
-      ...Object.values(indexes[elementName]).map((name) => {
-        const optionElement = document.createElement("option");
-        optionElement.value = name;
-        optionElement.textContent = name;
-        return optionElement;
-      })
-    );
-  });
-
-  return (data, state, action) => {
+  const applyFiltering = (query, state, action) => {
+    // код с обработкой очистки поля
     // Обработка очистки поля
     if (action?.name === "clear") {
       const field = action.dataset.field;
@@ -25,23 +22,27 @@ export function initFiltering(elements, indexes) {
       if (field) state[field] = "";
     }
 
-    // Собираем диапазон суммы в total: [from, to]
-    const target = { ...state };
+    // @todo: #4.5 — отфильтровать данные, используя компаратор
+    const filter = {};
+    Object.keys(elements).forEach((key) => {
+      if (elements[key]) {
+        if (
+          ["INPUT", "SELECT"].includes(elements[key].tagName) &&
+          elements[key].value
+        ) {
+          // ищем поля ввода в фильтре с непустыми данными
+          filter[`filter[${elements[key].name}]`] = elements[key].value; // чтобы сформировать в query вложенный объект фильтра
+        }
+      }
+    });
 
-    const from = target.totalFrom;
-    const to = target.totalTo;
+    return Object.keys(filter).length
+      ? Object.assign({}, query, filter)
+      : query; // если в фильтре что-то добавилось, применим к запросу
+  };
 
-    if (from !== "" || to !== "") {
-      target.total = [
-        from === "" ? undefined : Number(from),
-        to === "" ? undefined : Number(to),
-      ];
-    }
-
-    delete target.totalFrom;
-    delete target.totalTo;
-
-    // Возвращаем отфильтрованные данные, используя компаратор
-    return data.filter((row) => compare(row, target));
+  return {
+    updateIndexes,
+    applyFiltering,
   };
 }
